@@ -14,9 +14,23 @@ import {
   TrendingUp,
   Home,
   Medal,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
 import "./styles.css";
+import { TrainingView, WorkoutDialog, NextWorkout } from "./training/Training";
+import { usePlan } from "./training/usePlan";
+import {
+  todayKey,
+  mondayOf,
+  weekSessions,
+  earnedXp,
+  levelFor,
+  nextSession,
+  emptySession,
+  weekDrafts,
+  changeStatus,
+  dateLabel,
+} from "./training/model";
 
 const fmtDuration = (seconds) => {
   if (seconds === null || seconds === undefined) return "—";
@@ -45,39 +59,8 @@ const fmtDate = (s) => {
   return new Intl.DateTimeFormat("da-DK", {
     weekday: "long",
     day: "numeric",
-    month: "long"
+    month: "long",
   }).format(d);
-};
-
-const demo = {
-  id: "demo",
-  name: "Klubtræning",
-  date: new Date().toISOString(),
-
-  distanceKm: 47.2,
-  movingSeconds: 5460,
-
-  speed: {
-    averageKmh: 30.9,
-    maxKmh: 44.2
-  },
-
-  power: {
-    average: 103,
-    weighted: 127,
-    max: 462
-  },
-
-  cadence: {
-    average: 91
-  },
-
-  training: {
-    load: 71,
-    intensity: 92
-  },
-
-  efforts: []
 };
 
 function Metric({ icon: Icon, label, value, accent = false }) {
@@ -100,6 +83,7 @@ function NavButton({ icon: Icon, label, active, onClick }) {
     <button
       className={`nav-btn ${active ? "active" : ""}`}
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
     >
       <Icon size={20} />
       <span>{label}</span>
@@ -107,16 +91,31 @@ function NavButton({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function HomeView({ activity, live, refresh, loading }) {
+function HomeView({
+  activity,
+  live,
+  refresh,
+  loading,
+  loadError,
+  sessions,
+  today,
+  openWorkout,
+}) {
+  const upcoming = nextSession(sessions, today);
+  const totalXp = earnedXp(sessions);
+  const weekXp = earnedXp(weekSessions(sessions, mondayOf(today)));
+  const nextRace = sessions
+    .filter(
+      (s) => s.type === "race" && s.status === "planned" && s.date >= today,
+    )
+    .sort((a, b) => a.date.localeCompare(b.date))[0];
   const avgWatts = activity?.power?.average;
   const weightedWatts = activity?.power?.weighted;
   const maxWatts = activity?.power?.max;
 
   const hardestEffort =
     Array.isArray(activity?.efforts) && activity.efforts.length
-      ? [...activity.efforts].sort(
-          (a, b) => (b.watts || 0) - (a.watts || 0)
-        )[0]
+      ? [...activity.efforts].sort((a, b) => (b.watts || 0) - (a.watts || 0))[0]
       : null;
 
   return (
@@ -130,58 +129,16 @@ function HomeView({ activity, live, refresh, loading }) {
 
           <h1>God dag, Arthur.</h1>
 
-          <p className="hero-copy">
-            Næste mål starter med dagens træning.
-          </p>
+          <p className="hero-copy">Næste mål starter med dagens træning.</p>
         </div>
 
         <div className="level-pill">
           <span>LEVEL</span>
-          <b>12</b>
+          <b>{levelFor(totalXp)}</b>
         </div>
       </section>
 
-      <section className="today-card">
-        <div className="today-top">
-          <div>
-            <span className="kicker">
-              NÆSTE TRÆNING · TIRSDAG
-            </span>
-
-            <h2>Klubtræning</h2>
-
-            <p>
-              Fokus: accelerationer efter sving og placering i feltet.
-            </p>
-          </div>
-
-          <div className="workout-orb">
-            <Bike size={28} />
-          </div>
-        </div>
-
-        <div className="workout-strip">
-          <div>
-            <span>VARIGHED</span>
-            <strong>~90 min</strong>
-          </div>
-
-          <div>
-            <span>INTENSITET</span>
-            <strong>Hård</strong>
-          </div>
-
-          <div>
-            <span>XP</span>
-            <strong>+50</strong>
-          </div>
-        </div>
-
-        <button className="primary-btn">
-          Se træningen
-          <ChevronRight size={19} />
-        </button>
-      </section>
+      <NextWorkout session={upcoming} onOpen={openWorkout} />
 
       <div className="section-head">
         <div>
@@ -189,113 +146,116 @@ function HomeView({ activity, live, refresh, loading }) {
           <h3>Seneste aktivitet</h3>
         </div>
 
-        <button
-          className="icon-btn"
-          onClick={refresh}
-          aria-label="Opdater"
-        >
-          <RefreshCw
-            size={18}
-            className={loading ? "spin" : ""}
-          />
+        <button className="icon-btn" onClick={refresh} aria-label="Opdater">
+          <RefreshCw size={18} className={loading ? "spin" : ""} />
         </button>
       </div>
 
-      <section className="activity-card">
-        <div className="activity-title">
-          <div className="ride-badge">
-            <Activity size={20} />
-          </div>
-
-          <div>
-            <h2>{activity.name || "Cykeltur"}</h2>
-            <p>{fmtDate(activity.date)}</p>
-          </div>
-
-          <span
-            className={`source-chip ${live ? "live" : ""}`}
-          >
-            {live ? "LIVE DATA" : "DEMO"}
-          </span>
-        </div>
-
-        <div className="metric-grid">
-          <Metric
-            icon={MapPin}
-            label="Distance"
-            value={fmtDistance(activity.distanceKm)}
-          />
-
-          <Metric
-            icon={Timer}
-            label="Tid"
-            value={fmtDuration(activity.movingSeconds)}
-          />
-
-          <Metric
-            icon={Gauge}
-            label="Avg. fart"
-            value={fmtSpeed(activity?.speed?.averageKmh)}
-          />
-
-          <Metric
-            icon={Zap}
-            label="Avg. watt"
-            value={
-              avgWatts !== null && avgWatts !== undefined
-                ? `${Math.round(avgWatts)} W`
-                : "—"
-            }
-            accent
-          />
-
-          <Metric
-            icon={TrendingUp}
-            label="Weighted"
-            value={
-              weightedWatts !== null &&
-              weightedWatts !== undefined
-                ? `${Math.round(weightedWatts)} W`
-                : "—"
-            }
-          />
-
-          <Metric
-            icon={Zap}
-            label="Max watt"
-            value={
-              maxWatts !== null && maxWatts !== undefined
-                ? `${Math.round(maxWatts)} W`
-                : "—"
-            }
-          />
-        </div>
-
-        {hardestEffort && (
-          <div className="effort-highlight">
-            <div className="effort-icon">
-              <Zap size={20} />
+      {loadError && (
+        <p className="load-error" role="alert">
+          {loadError}
+        </p>
+      )}
+      {!activity ? (
+        <section className="activity-card">
+          <p className="form-hint">
+            {loading
+              ? "Henter din seneste aktivitet…"
+              : "Ingen aktivitet at vise. Tryk Opdater for at prøve igen."}
+          </p>
+        </section>
+      ) : (
+        <section className="activity-card">
+          <div className="activity-title">
+            <div className="ride-badge">
+              <Activity size={20} />
             </div>
 
             <div>
-              <span className="kicker">HÅRDT RYK</span>
-
-              <h3>
-                {hardestEffort.durationSeconds} sek ·{" "}
-                {Math.round(hardestEffort.watts)} W
-              </h3>
-
-              <p>
-                {hardestEffort.cadence
-                  ? `${Math.round(
-                      hardestEffort.cadence
-                    )} rpm`
-                  : "Automatisk fundet af Intervals.icu"}
-              </p>
+              <h2>{activity.name || "Cykeltur"}</h2>
+              <p>{fmtDate(activity.date)}</p>
             </div>
+
+            <span className={`source-chip ${live ? "live" : ""}`}>
+              {live ? "LIVE DATA" : "SIDST HENTET"}
+            </span>
           </div>
-        )}
-      </section>
+
+          <div className="metric-grid">
+            <Metric
+              icon={MapPin}
+              label="Distance"
+              value={fmtDistance(activity.distanceKm)}
+            />
+
+            <Metric
+              icon={Timer}
+              label="Tid"
+              value={fmtDuration(activity.movingSeconds)}
+            />
+
+            <Metric
+              icon={Gauge}
+              label="Avg. fart"
+              value={fmtSpeed(activity?.speed?.averageKmh)}
+            />
+
+            <Metric
+              icon={Zap}
+              label="Avg. watt"
+              value={
+                avgWatts !== null && avgWatts !== undefined
+                  ? `${Math.round(avgWatts)} W`
+                  : "—"
+              }
+              accent
+            />
+
+            <Metric
+              icon={TrendingUp}
+              label="Weighted"
+              value={
+                weightedWatts !== null && weightedWatts !== undefined
+                  ? `${Math.round(weightedWatts)} W`
+                  : "—"
+              }
+            />
+
+            <Metric
+              icon={Zap}
+              label="Max watt"
+              value={
+                maxWatts !== null && maxWatts !== undefined
+                  ? `${Math.round(maxWatts)} W`
+                  : "—"
+              }
+            />
+          </div>
+
+          {hardestEffort && (
+            <div className="effort-highlight">
+              <div className="effort-icon">
+                <Zap size={20} />
+              </div>
+
+              <div>
+                <span className="kicker">HÅRDT RYK</span>
+
+                <h3>
+                  {hardestEffort.durationSeconds} sek ·{" "}
+                  {Math.round(hardestEffort.watts)} W
+                </h3>
+
+                <p>
+                  {hardestEffort.cadence
+                    ? `${Math.round(hardestEffort.cadence)} rpm`
+                    : "Automatisk fundet af Intervals.icu"}
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="split-grid">
         <div className="mini-card race">
@@ -305,14 +265,12 @@ function HomeView({ activity, live, refresh, loading }) {
 
           <span className="kicker">NÆSTE LØB</span>
 
-          <h3>Licensløb</h3>
-
-          <p>12 dage</p>
-
-          <div className="countdown">
-            12
-            <span>DAGE</span>
-          </div>
+          <h3>{nextRace?.title || "Næste start?"}</h3>
+          <p>
+            {nextRace
+              ? dateLabel(nextRace.date, { day: "numeric", month: "long" })
+              : "Tilføj et løb i din ugeplan."}
+          </p>
         </div>
 
         <div className="mini-card xp">
@@ -322,12 +280,14 @@ function HomeView({ activity, live, refresh, loading }) {
 
           <span className="kicker">DENNE UGE</span>
 
-          <h3>340 XP</h3>
+          <h3>{weekXp} XP</h3>
 
-          <p>160 XP til Level 13</p>
+          <p>
+            {500 - (totalXp % 500)} XP til Level {levelFor(totalXp) + 1}
+          </p>
 
           <div className="progress">
-            <i style={{ width: "68%" }} />
+            <i style={{ width: `${(totalXp % 500) / 5}%` }} />
           </div>
         </div>
       </section>
@@ -338,16 +298,16 @@ function HomeView({ activity, live, refresh, loading }) {
           <b>01</b>
         </div>
 
-        <h3>Ugens fokus</h3>
+        <h3>En god rytme slår en perfekt dag.</h3>
 
         <p>
-          Du har farten. Nu træner vi evnen til hurtigt at lukke
-          hullet efter accelerationer og sving.
+          Planlæg sammen med din coach. Både træning og pauser tæller, og planen
+          må gerne tilpasses, når benene eller hverdagen kalder på det.
         </p>
 
         <div className="coach-tags">
-          <span>⚡ Acceleration</span>
-          <span>🚴 Feltposition</span>
+          <span>Træning</span>
+          <span>Restitution</span>
         </div>
       </section>
     </>
@@ -361,9 +321,7 @@ function Placeholder({ title, copy, icon: Icon }) {
         <Icon size={34} />
       </div>
 
-      <span className="kicker">
-        KOMMER I NÆSTE BYG
-      </span>
+      <span className="kicker">KOMMER I NÆSTE BYG</span>
 
       <h2>{title}</h2>
 
@@ -374,16 +332,45 @@ function Placeholder({ title, copy, icon: Icon }) {
 
 function App() {
   const [tab, setTab] = useState("home");
-  const [activity, setActivity] = useState(demo);
+  const [activity, setActivity] = useState(null);
   const [live, setLive] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const { sessions, update, error: planError, blocked } = usePlan();
+  const [today, setToday] = useState(todayKey);
+  const [opened, setOpened] = useState(null);
+  const [newWorkout, setNewWorkout] = useState(null);
+  const loadingRef = React.useRef(false);
+  useEffect(() => {
+    const tick = () => setToday(todayKey());
+    const timer = setInterval(tick, 60000);
+    window.addEventListener("focus", tick);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", tick);
+    };
+  }, []);
+  const closeWorkout = () => {
+    setOpened(null);
+    setNewWorkout(null);
+  };
+  const selectedWorkout = newWorkout || sessions.find((s) => s.id === opened);
+  const openWorkout = (s) => {
+    setTab("plan");
+    if (s) setOpened(s.id);
+    window.scrollTo({ top: 0 });
+  };
 
   const load = async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
+    setLoadError("");
 
     try {
       const r = await fetch("/api/latest-activity", {
-        cache: "no-store"
+        cache: "no-store",
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!r.ok) {
@@ -392,6 +379,7 @@ function App() {
 
       const data = await r.json();
 
+      if (!data?.activity?.id) throw new Error("Invalid activity");
       if (data?.activity) {
         setActivity(data.activity);
         setLive(true);
@@ -399,7 +387,11 @@ function App() {
     } catch (e) {
       console.error("Kunne ikke hente aktivitet", e);
       setLive(false);
+      setLoadError(
+        "Kunne ikke opdatere fra Intervals.icu. Prøv igen om lidt. Eventuelle viste tal er fra seneste hentning.",
+      );
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };
@@ -417,16 +409,26 @@ function App() {
         live={live}
         refresh={load}
         loading={loading}
+        loadError={loadError}
+        sessions={sessions}
+        today={today}
+        openWorkout={openWorkout}
       />
     );
   }
 
   if (tab === "plan") {
     content = (
-      <Placeholder
-        title="Ugeplan"
-        copy="Cykling, klubtræning, styrke og restitution samlet i én levende ugeplan."
-        icon={CalendarDays}
+      <TrainingView
+        sessions={sessions}
+        today={today}
+        blocked={blocked}
+        onOpen={(s) => setOpened(s.id)}
+        onCreate={(date) => setNewWorkout(emptySession(date))}
+        onDrafts={(monday) => {
+          if (!weekSessions(sessions, monday).length)
+            update([...sessions, ...weekDrafts(monday)]);
+        }}
       />
     );
   }
@@ -475,14 +477,38 @@ function App() {
           </div>
         </div>
 
-        <div className="avatar">
-          AV
-        </div>
+        <div className="avatar">AV</div>
       </header>
 
       <main>
+        {planError && (
+          <p className="form-error" role="alert">
+            {planError}
+          </p>
+        )}
         {content}
       </main>
+      {selectedWorkout && (
+        <WorkoutDialog
+          key={selectedWorkout.id}
+          session={selectedWorkout}
+          isNew={Boolean(newWorkout)}
+          today={today}
+          blocked={blocked}
+          onClose={closeWorkout}
+          onSave={(s) =>
+            update(
+              sessions.some((x) => x.id === s.id)
+                ? sessions.map((x) => (x.id === s.id ? s : x))
+                : [...sessions, s],
+            )
+          }
+          onDelete={(id) => update(sessions.filter((s) => s.id !== id))}
+          onStatus={(id, status) =>
+            update(changeStatus(sessions, id, status, today))
+          }
+        />
+      )}
 
       <nav className="bottom-nav">
         <NavButton
@@ -524,6 +550,4 @@ function App() {
   );
 }
 
-createRoot(
-  document.getElementById("root")
-).render(<App />);
+createRoot(document.getElementById("root")).render(<App />);
