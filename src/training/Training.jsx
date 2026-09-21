@@ -607,6 +607,7 @@ export function WorkoutDialog({
             <label>
               Type
               <select
+                aria-label="Type"
                 value={draft.type}
                 onChange={(e) => {
                   const type = e.target.value;
@@ -650,6 +651,7 @@ export function WorkoutDialog({
             <label>
               Intensitet
               <select
+                aria-label="Intensitet"
                 value={draft.intensity}
                 onChange={(e) => patch({ intensity: e.target.value })}
               >
@@ -841,6 +843,7 @@ export function WorkoutDialog({
           <label>
             Status
             <select
+              aria-label="Status"
               value={draft.status}
               disabled={["completed", "skipped"].includes(session.status)}
               onChange={(e) => patch({ status: e.target.value })}
