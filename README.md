@@ -4,7 +4,7 @@ Mobil-first React/Vite-app med server-side Intervals.icu integration og en træn
 
 ## Lokal udvikling
 
-Node.js 20+.
+Node.js 22.13+ (eller 24+).
 
 ```sh
 npm ci
@@ -48,7 +48,9 @@ Eksisterende manifest, SVG-ikon og standalone-visning er bevaret. Projektet har 
 
 ## Verifikation
 
-`npm test` dækker uge-/årsskift, sommertid, udkast, XP/fortrydelse, fremtidig gennemførelse, datavalidering samt API-normalisering med en eksplicit testfixture og server-side auth.
+`npm test` kører 14 tests: uge-/årsskift, sommertid, udkast, XP/fortrydelse, fremtidig gennemførelse, datavalidering og API-normalisering samt React-brugerforløb for oprettelse, redigering, styrkeøvelser, sletning, genindlæsning og fejl i API/lagring. API-data i testene er eksplicitte fixtures. React-testene bruger JSDOM og erstatter ikke visuel kontrol i en rigtig browser.
+
+`src/main.jsx` starter appen; `src/App.jsx` indeholder den fælles app og kan indlæses isoleret i tests.
 
 Browserkontrol før merge:
 
