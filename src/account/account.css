@@ -42,3 +42,28 @@
   font-size: 12px;
   padding: 8px 10px;
 }
+.account-card button:not(.primary-btn),
+.sync-bar button {
+  border: 1px solid #344b53;
+  border-radius: 12px;
+  background: #192c33;
+  color: #dce8ec;
+  font: inherit;
+  font-weight: 600;
+  padding: 11px 14px;
+  cursor: pointer;
+}
+.account-card button:disabled,
+.sync-bar button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.sync-bar button {
+  font-size: 12px;
+  padding: 8px 10px;
+}
+.account-card button:focus-visible,
+.sync-bar button:focus-visible {
+  outline: 2px solid #c3ff32;
+  outline-offset: 3px;
+}
