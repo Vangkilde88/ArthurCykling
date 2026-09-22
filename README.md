@@ -63,3 +63,35 @@ Browserkontrol før merge:
 ## Næste skridt
 
 Fælles lagring med adgangskontrol for forælder/coach, derefter eksplicit match mellem plan og faktiske aktiviteter. Power curve kræver verificeret Intervals.icu API-understøttelse; ingen nye endpoints er antaget.
+
+## Shared family plan (Supabase)
+
+The family uses one email/password Auth account on both phones. Both devices can
+edit workouts and mark completion. Sessions persist locally; the shared plan is
+loaded after sign-in and refreshed every 10 seconds while visible, and on focus
+or reconnect. Sign-out affects only the current phone. Offline writes are not
+queued and a failed save is never shown as confirmed.
+
+Existing local workouts remain on the original device. The account screen can
+import them into the shared plan; remote workouts with matching IDs win. XP is
+derived from the saved workouts, not stored in a separate counter. Concurrent
+writes use revision compare-and-swap; stale edits are rejected without replacing
+the newer plan. Polling pauses while a workout dialog is open.
+
+`db/family-plan.sql` records the deployed schema. RLS requires both the authenticated
+owner ID and a private approved email. Configure the allowed email separately in
+`private.family_accounts`; never commit family contact details. Only the public
+Supabase URL and publishable key belong in the client.
+
+Before enabling account signup in production, configure Supabase Auth Site URL as
+`https://arthur-cykling.vercel.app/` and allow that exact redirect URL. Keep email
+confirmation enabled. Verify that the permitted family email can receive Auth
+emails (Supabase's default email sender is restricted; configure SMTP if needed).
+A parent chooses the password in the app and confirms the email. Do not put real
+passwords, tokens or confirmation links into GitHub issues or source code.
+
+`e2e/shared-plan.spec.js` exercises two independent browser contexts against a
+mock REST store, including persisted login, sync, stale revisions and failed
+writes. It does not claim to test delivery of real confirmation emails. Production
+RLS was separately checked with temporary owner/outsider fixtures in a rolled-back
+transaction.

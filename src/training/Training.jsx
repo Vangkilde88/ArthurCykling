@@ -161,6 +161,7 @@ export function TrainingView({
   onCreate,
   onDrafts,
   blocked,
+  shared = false,
 }) {
   const [monday, setMonday] = useState(mondayOf(today));
   const [selectedDay, setSelectedDay] = useState(today);
@@ -495,8 +496,9 @@ export function TrainingView({
         </div>
       </div>
       <p className="storage-note">
-        Planen gemmes på denne enhed · synkronisering mellem enheder kommer
-        senere.
+        {shared
+          ? "Fælles plan · gemmes på familiekontoen og deles mellem jeres telefoner."
+          : "Planen gemmes kun på denne telefon. Vælg Del planen for at bruge den på begge telefoner."}
       </p>
     </div>
   );
@@ -530,7 +532,7 @@ export function WorkoutDialog({
     };
   }, []);
   const patch = (fields) => setDraft((d) => ({ ...d, ...fields }));
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
     const clean = { ...draft, title: draft.title.trim() };
     const message = validateSession(clean);
@@ -538,10 +540,10 @@ export function WorkoutDialog({
       setError(message);
       return;
     }
-    if (onSave(clean)) onClose();
+    if (await onSave(clean)) onClose();
     else
       setError(
-        "Kunne ikke gemme. Prøv igen, når browserens lager er tilgængeligt.",
+        "Kunne ikke gemme. Se fejlbeskeden bag dette vindue. Luk og hent planen igen, hvis den er ændret på en anden telefon.",
       );
   };
   const updateStep = (i, field, value) =>
@@ -551,8 +553,8 @@ export function WorkoutDialog({
       ),
     });
   const numeric = (value) => (value === "" ? "" : Number(value));
-  const status = (value) => {
-    if (onStatus(session.id, value)) onClose();
+  const status = async (value) => {
+    if (await onStatus(session.id, value)) onClose();
     else setError("Ændringen kunne ikke gemmes.");
   };
   return (
@@ -1021,8 +1023,8 @@ export function WorkoutDialog({
               </p>
               <button
                 className="secondary-btn"
-                onClick={() => {
-                  if (onDelete(session.id)) onClose();
+                onClick={async () => {
+                  if (await onDelete(session.id)) onClose();
                   else setError("Kunne ikke slette træningen.");
                 }}
               >
