@@ -39,7 +39,10 @@ const mount = async () => {
   return view;
 };
 
+const nativeBroadcastChannel = globalThis.BroadcastChannel;
 before(async () => {
+  // JSDOM has no browser tabs; do not open Node broadcast ports.
+  globalThis.BroadcastChannel = undefined;
   dom = new JSDOM("<!doctype html><html><body></body></html>", {
     url: "http://localhost",
   });
@@ -83,6 +86,7 @@ beforeEach(() => {
 afterEach(() => cleanup());
 after(async () => {
   dom.window.close();
+  globalThis.BroadcastChannel = nativeBroadcastChannel;
   await rm(".test-build", { recursive: true, force: true });
 });
 
@@ -100,12 +104,18 @@ test("create interval workout → Home → complete → reload → undo; XP stay
   change("Watt til", "100");
   click("Brug som varighed");
   click("Gem træning");
+  await waitFor(() =>
+    assert.equal(Boolean(screen.queryByRole("dialog")), false),
+  );
   assert.equal(screen.queryByRole("dialog"), null);
   click("Hjem");
   assert.ok(screen.getByRole("heading", { name: "Tempo-test" }));
   click("Se træningen");
   assert.ok(screen.getByText("80–100 W"));
   click("Markér gennemført · +50 XP");
+  await waitFor(() =>
+    assert.equal(Boolean(screen.queryByRole("dialog")), false),
+  );
   assert.match(document.querySelector(".week-stats").textContent, /50 XP/);
   view.unmount();
   view = await mount();
@@ -115,6 +125,9 @@ test("create interval workout → Home → complete → reload → undo; XP stay
     screen.getByRole("button", { name: /Interval.*Gennemført.*Tempo-test/ }),
   );
   click("Fortryd gennemførelse");
+  await waitFor(() =>
+    assert.equal(Boolean(screen.queryByRole("dialog")), false),
+  );
   assert.match(document.querySelector(".week-stats").textContent, /0 XP/);
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
   assert.equal(saved.sessions[0].status, "planned");
@@ -131,6 +144,9 @@ test("strength exercises survive edit; skipped workout can be restored and delet
   change("Sæt, gentagelser eller tid", "2 × 8");
   change("Status", "planned");
   click("Gem træning");
+  await waitFor(() =>
+    assert.equal(Boolean(screen.queryByRole("dialog")), false),
+  );
   fireEvent.click(
     screen.getByRole("button", { name: /Styrke.*Planlagt.*Styrketest/ }),
   );
@@ -138,21 +154,33 @@ test("strength exercises survive edit; skipped workout can be restored and delet
   click("Rediger");
   change("Titel", "Styrketest ændret");
   click("Gem træning");
+  await waitFor(() =>
+    assert.equal(Boolean(screen.queryByRole("dialog")), false),
+  );
   fireEvent.click(
     screen.getByRole("button", { name: /Styrke.*Planlagt.*Styrketest ændret/ }),
   );
   click("Spring over");
+  await waitFor(() =>
+    assert.equal(Boolean(screen.queryByRole("dialog")), false),
+  );
   fireEvent.click(
     screen.getByRole("button", {
       name: /Styrke.*Sprunget over.*Styrketest ændret/,
     }),
   );
   click("Fortryd spring over");
+  await waitFor(() =>
+    assert.equal(Boolean(screen.queryByRole("dialog")), false),
+  );
   fireEvent.click(
     screen.getByRole("button", { name: /Styrke.*Planlagt.*Styrketest ændret/ }),
   );
   click("Slet træning");
   click("Ja, slet");
+  await waitFor(() =>
+    assert.equal(Boolean(screen.queryByRole("dialog")), false),
+  );
   assert.equal(
     JSON.parse(localStorage.getItem(STORAGE_KEY)).sessions.length,
     0,
@@ -212,7 +240,7 @@ test("failed write keeps workout dialog open and does not claim completion", asy
   });
   click("Markér gennemført · +50 XP");
   assert.ok(screen.getByRole("dialog"));
-  assert.ok(screen.getByText("Ændringen kunne ikke gemmes."));
+  await screen.findByText(/Ændringen kunne ikke gemmes/);
   assert.equal(
     JSON.parse(localStorage.getItem(STORAGE_KEY)).sessions[0].status,
     "planned",

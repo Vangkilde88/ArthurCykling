@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import "./styles.css";
 import { TrainingView, WorkoutDialog, NextWorkout } from "./training/Training";
+import { Account } from "./account/Account";
+import { useSharedPlan } from "./account/useSharedPlan";
 import { usePlan } from "./training/usePlan";
 import {
   todayKey,
@@ -335,10 +337,14 @@ export default function App() {
   const [live, setLive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const { sessions, update, error: planError, blocked } = usePlan();
+  const localPlan = usePlan();
   const [today, setToday] = useState(todayKey);
   const [opened, setOpened] = useState(null);
   const [newWorkout, setNewWorkout] = useState(null);
+  const shared = useSharedPlan(Boolean(opened || newWorkout));
+  const plan = shared.user ? shared : localPlan;
+  const { sessions, update, error: planError } = plan;
+  const blocked = plan.blocked || !shared.ready;
   const loadingRef = React.useRef(false);
   useEffect(() => {
     const tick = () => setToday(todayKey());
@@ -422,6 +428,7 @@ export default function App() {
         sessions={sessions}
         today={today}
         blocked={blocked}
+        shared={Boolean(shared.user)}
         onOpen={(s) => setOpened(s.id)}
         onCreate={(date) => setNewWorkout(emptySession(date))}
         onDrafts={(monday) => {
@@ -454,10 +461,17 @@ export default function App() {
 
   if (tab === "athlete") {
     content = (
-      <Placeholder
-        title="Arthur"
-        copy="Levels, XP, badges, streaks og personlige milepæle."
-        icon={Medal}
+      <Account
+        shared={shared}
+        localSessions={localPlan.sessions}
+        localBlocked={localPlan.blocked}
+        onImport={() => {
+          const ids = new Set(shared.sessions.map((s) => s.id));
+          return shared.update([
+            ...shared.sessions,
+            ...localPlan.sessions.filter((s) => !ids.has(s.id)),
+          ]);
+        }}
       />
     );
   }
@@ -480,6 +494,27 @@ export default function App() {
       </header>
 
       <main>
+        <div className="sync-bar" role="status">
+          <span>
+            {!shared.ready
+              ? "Kontrollerer login…"
+              : shared.user
+                ? shared.busy
+                  ? "Gemmer fælles plan…"
+                  : shared.revision == null
+                    ? "Henter fælles plan…"
+                    : "Fælles plan · opdateres automatisk"
+                : "Planen er kun på denne telefon"}
+          </span>
+          <button onClick={() => setTab("athlete")}>
+            {shared.user ? "Familiekonto" : "Del planen"}
+          </button>
+        </div>
+        {!shared.user && shared.error && (
+          <p role="alert" className="form-error">
+            {shared.error}
+          </p>
+        )}
         {planError && (
           <p className="form-error" role="alert">
             {planError}

@@ -1,0 +1,44 @@
+.account-card {
+  padding: 28px 20px;
+  border: 1px solid var(--line, #294047);
+  border-radius: 24px;
+  background: #101f24;
+}
+.account-card h1 {
+  font-size: clamp(26px, 6vw, 36px);
+  margin: 14px 0;
+}
+.account-card p {
+  color: #9aafb7;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.account-card button {
+  margin: 8px 0;
+}
+.account-card .workout-form {
+  margin: 24px 0 12px;
+}
+.import-panel {
+  border-top: 1px solid #294047;
+  border-bottom: 1px solid #294047;
+  margin: 24px 0;
+  padding: 14px 0;
+}
+.sync-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border-radius: 14px;
+  background: #101f24;
+  color: #a7bec4;
+  font-size: 12px;
+}
+.sync-bar button {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 8px 10px;
+}
